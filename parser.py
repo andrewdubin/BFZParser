@@ -47,3 +47,14 @@ df.loc[(df['Client ID Counter']>1) & (df['1stDateofID']!=df['Date of Identificat
 #Step 9, Output
 output = input("Parsing Finished. Output File Name?: ")
 df.to_csv(output)
+
+#Step 10, Determine clients that "No longer meets population criteria" by demographic info
+#All persons, all singles, veterans, chronic, chronic veteran, youth, families
+print("How many clients this month No longer meet population criteria?")
+print("All clients ",df['Dismissal Reason'].where(df['Dismissal Reason']=="No longer meets population criteria").count())
+print("Singles ",df['Dismissal Reason'].where((df['Dismissal Reason']=="No longer meets population criteria")&(df['Household Type']=='Single Adults')).count())
+print("Veterans ",df['Dismissal Reason'].where((df['Dismissal Reason']=="No longer meets population criteria")&(df['Veteran Status']=='Yes')).count())
+print("Chronic ",df['Dismissal Reason'].where((df['Dismissal Reason']=="No longer meets population criteria")&(df['Chronic Status']=='Yes')).count())
+print("Chronic Veterans ",df['Dismissal Reason'].where((df['Dismissal Reason']=="No longer meets population criteria")&(df['Chronic Status']=='Yes')&(df['Veteran Status']=='Yes')).count())
+print("Youth ",df['Dismissal Reason'].where((df['Dismissal Reason']=="No longer meets population criteria")&(df['Household Type']=='Youth')).count())
+print("Families ",df['Dismissal Reason'].where((df['Dismissal Reason']=="No longer meets population criteria")&(df['Household Type']=='Families')).count())
