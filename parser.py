@@ -17,8 +17,20 @@ household_type = {"Arlington Zero: Chronic - Veterans Only":"Single Adults",
 "Arlington Zero: TAY":"Youth"}
 df['Household Type'] = df['Program Name'].map(household_type)
 
-#Step 3: Adding Case Number Counter
+#Step 3: Adding Client ID Counter and Client ID Household Counter
+#Client ID Counter
 df['Client ID Counter'] = df['Client ID'].map(df.groupby('Client ID').agg({'Client ID':'count'})['Client ID'])
+#Client ID Household Counter
+counter = {}
+for i in df['Client ID']:
+    if i not in counter:
+        counter[i] = {"Single Adults":0,"Families":0,"Youth":0}
+for j in counter:
+    for k in df[df['Client ID']==j]['Household Type']:
+        counter[j][k] += 1
+df['Client ID Household Counter'] = np.nan
+for i in df.index:
+    df.loc[i,'Client ID Household Counter'] = counter[df.loc[i,'Client ID']][df.loc[i,'Household Type']]
 
 #Step 4: Adding Chronic Column
 #If client is in Chronic & Vet and 'No' to Veteran Status, then they are chronic
@@ -26,7 +38,7 @@ df['Chronic Status'] = np.nan
 df.loc[(df['Program Name']=="Arlington Zero: Chronic - Veterans Only") & (df['Veteran Status']=="No")
 ,"Chronic Status"] = "Yes"
 
-#Step 5, remap all dismissal reasons
+#Step 5, Remap all dismissal reasons
 from values import dismissal
 df['Dismissal Reason'] = df['Dismissal Reason'].map(dismissal)
 
@@ -39,6 +51,7 @@ df['Housing Move-In Date']
 df['Inactive Date'] = df['Program End Date'][df["Dismissal Reason"]!="Housed"]
 
 #Step 8, Calculate 1stDateofID, then calculate Returned to Active Date (Date of Idenfication on second record)
+#Consider revising Return to Active Date formula
 df['1stDateofID'] = df['Client ID'].map(df.groupby('Client ID').agg({'Date of Identification':'min'})['Date of Identification'])
 df['Return to Active Date'] = np.nan
 df.loc[(df['Client ID Counter']>1) & (df['1stDateofID']!=df['Date of Identification'])
