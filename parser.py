@@ -35,7 +35,7 @@ for i in df.index:
 #Step 4: Adding Chronic Column
 #If client is in Chronic & Vet and 'No' to Veteran Status, then they are chronic
 df['Chronic Status'] = np.nan
-df.loc[(df['Program Name']=="Arlington Zero: Chronic - Veterans Only") & (df['Veteran Status']=="No")
+df.loc[(df['Program Name']=="Arlington Zero: Chronic - Veterans Only") & (df['Veteran Status']!="Yes")
 ,"Chronic Status"] = "Yes"
 
 #Step 5, Remap all dismissal reasons
@@ -48,13 +48,13 @@ df['Housing Move-In Date']
 
 #Step 7, Populate Inactive Date
 #Do we consider those with program end date and null dismissal reasons as inactive?
-df['Inactive Date'] = df['Program End Date'][df["Dismissal Reason"]!="Housed"]
+df['Inactive Date'] = df['Program End Date'][df["Dismissal Reason"]=="Inactive"]
 
 #Step 8, Calculate 1stDateofID, then calculate Returned to Active Date (Date of Idenfication on second record)
 #Consider revising Return to Active Date formula
 df['1stDateofID'] = df['Client ID'].map(df.groupby('Client ID').agg({'Date of Identification':'min'})['Date of Identification'])
 df['Return to Active Date'] = np.nan
-df.loc[(df['Client ID Counter']>1) & (df['1stDateofID']!=df['Date of Identification'])
+df.loc[(df['Client ID Household Counter']>1) & (df['1stDateofID']!=df['Date of Identification'])
 ,"Return to Active Date"] = df['Date of Identification']
 
 #Step 9, Output
