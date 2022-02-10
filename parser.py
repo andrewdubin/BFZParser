@@ -44,7 +44,6 @@ df['Dismissal Reason'] = df['Dismissal Reason'].map(dismissal)
 
 #Step 6, Populate Housing Move-In Date
 df['Housing Move-In Date'] = df["Program End Date"][df["Dismissal Reason"]=="Housed"]
-df['Housing Move-In Date']
 
 #Step 7, Populate Inactive Date
 #Do we consider those with program end date and null dismissal reasons as inactive?
