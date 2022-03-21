@@ -1,7 +1,7 @@
 dismissal = {"Absent without leave (AWOL)":"Inactive",
 "Client no show":"Inactive",
 "Client not engaged within the past 30 days":"No longer meets population criteria",
-"Criminal Activity/Destuction of Property/Violence":"No longer meets population criteria",
+"Criminal Activity/Destruction of Property/Violence":"No longer meets population criteria",
 "Death":"No longer meets population criteria",
 "Declined shelter placement/Remained homeless":"Inactive",
 "Declined shelter placement/Resolved own situation":"Housed",
