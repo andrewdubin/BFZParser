@@ -5,7 +5,7 @@ import numpy as np
 file = input("File Name?: ")
 df = pd.read_csv(file,parse_dates=['Program Start Date','Program End Date'])
 df = df.rename(columns={"Program Start Date":"Date of Identification",'Case Number':'Client ID','Veteran Status (HUD)':'Veteran Status'})
-df = df.drop(["Relationship","Family Name",'Name'],axis=1)
+df = df.drop('Name',axis=1)
 df = df.drop_duplicates()
 df = df.reset_index()
 df = df.drop(['index'],axis=1)
@@ -62,13 +62,12 @@ df['Most Recent Move-In Date'] = df['Client ID'].map(df.groupby('Client ID').agg
 df['Most Recent Inactive Date'] = df['Client ID'].map(df.groupby('Client ID').agg({'Inactive Date':'max'})['Inactive Date'])
 
 #Step 10, Narrow down dataframe down to active clients and newly exited clients for the reporting month
-reporting_year = input("Reporting Year? Enter four digits: ")
-reporting_month = input("Reporting Month? Enter month number: ")
-reporting_date = pd.to_datetime(reporting_year+reporting_month,format='%Y%m',errors='ignore')
-num_of_days = reporting_date.days_in_month
 dates = {}
-dates['Reporting Date'] = str(reporting_date.year)+'-'+ str(reporting_date.month) +'-'+ str(num_of_days)
-dates['Start Date'] = str(reporting_date.year)+'-'+ str(reporting_date.month) +'-1'
+dates["Reporting Year"] = input("Reporting Year? Enter four digits: ")
+dates["Reporting Month"] = input("Reporting Month? Enter either proper string or number ")
+dates['Start Date'] = pd.to_datetime(dates["Reporting Year"]+dates["Reporting Month"],format='%Y%m',errors='ignore')
+dates['Last Day'] = dates['Start Date'].days_in_month
+dates['Reporting Date'] = dates['Start Date'].replace(day=dates['Last Day'])
 
 active_df = df[(df['Date of Identification']<=dates['Reporting Date']) &
 ((df['Program End Date'].isnull()==True) | (df['Program End Date']<df['Date of Identification']) | (df['Program End Date']>dates['Reporting Date']))]
@@ -77,47 +76,44 @@ filtered_df = pd.concat([active_df,exited_df])
 filtered_df = filtered_df.reset_index()
 filtered_df = filtered_df.drop(['index'],axis=1)
 
-#Step 11, Output
-output = input("Parsing Finished. Output File Name?: ")
-filtered_df.to_csv(output)
-
-#Step 12, Determine clients that "No longer meets population criteria" by demographic info
+#Step 11, Determine clients that "No longer meets population criteria" by demographic info
 #All persons, all singles, veterans, chronic, chronic veteran, youth, families
 print("\nHow many clients this month No longer meet population criteria?")
-print("All clients ",filtered_df['Dismissal Reason'].where(filtered_df['Dismissal Reason']=="No longer meets population criteria").count())
-print("Singles ",filtered_df['Dismissal Reason'].where((filtered_df['Dismissal Reason']=="No longer meets population criteria")&(filtered_df['Household Type']=='Single Adults')).count())
-print("Veterans ",filtered_df['Dismissal Reason'].where((filtered_df['Dismissal Reason']=="No longer meets population criteria")&(filtered_df['Veteran Status']=='Yes')).count())
-print("Chronic ",filtered_df['Dismissal Reason'].where((filtered_df['Dismissal Reason']=="No longer meets population criteria")&(filtered_df['Chronic Status']=='Yes')).count())
-print("Chronic Veterans ",filtered_df['Dismissal Reason'].where((filtered_df['Dismissal Reason']=="No longer meets population criteria")&(filtered_df['Chronic Status']=='Yes')&(filtered_df['Veteran Status']=='Yes')).count())
-print("Youth ",filtered_df['Dismissal Reason'].where((filtered_df['Dismissal Reason']=="No longer meets population criteria")&(filtered_df['Household Type']=='Youth')).count())
-print("Families ",filtered_df['Dismissal Reason'].where((filtered_df['Dismissal Reason']=="No longer meets population criteria")&(filtered_df['Household Type']=='Families')).count())
+print("All clients ",exited_df['Dismissal Reason'].where(exited_df['Dismissal Reason']=="No longer meets population criteria").count())
+print("Singles ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Household Type']=='Single Adults')).count())
+print("Veterans ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Veteran Status']=='Yes')).count())
+print("Chronic ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Chronic Status']=='Yes')).count())
+print("Chronic Veterans ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Chronic Status']=='Yes')&(exited_df['Veteran Status']=='Yes')).count())
+print("Youth ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Household Type']=='Youth')).count())
+print("Families ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Household Type']=='Families')).count())
 
-#Step 13, Calculate BFZ Reporting Metrics to make sure numbers match
+#Step 12, Calculate BFZ Reporting Metrics to make sure numbers match
 print("\nBFZ Reporting Metrics")
-print("Actively Homeless ", filtered_df['Client ID'].where(filtered_df['Program End Date'].isnull()==True).nunique())
-print("Housing Placements ", filtered_df['Client ID'].where(filtered_df['Dismissal Reason']=='Housed').nunique())
-print("Moved to Inactive ", filtered_df['Client ID'].where(filtered_df['Dismissal Reason']=='Inactive').nunique())
-def newly_identified_number():
-    nin = {}
-    for i in filtered_df['Client ID']:
-        if i not in nin:
-            nin[i] = False
-    for j in nin:
-        for k in filtered_df[filtered_df['Client ID']==j]['Date of Identification']:
-            if k.year == reporting_date.year and k.month == reporting_date.month:
-                nin[j] = True
-    nin_counter = 0
-    for x in nin:
-        if x == True:
-            nin_counter += 1
-    return nin_counter
-print("Newly Identified Inflow ",newly_identified_number())
-
+print("Actively Homeless ", len(active_df),
+"+",exited_df['Client ID'].where(exited_df['Dismissal Reason']=='No longer meets population criteria').count(),'No longer meet population criteria')
+print("Housing Placements ", exited_df['Client ID'].where(exited_df['Dismissal Reason']=='Housed').count())
+print("Moved to Inactive ", exited_df['Client ID'].where(exited_df['Dismissal Reason']=='Inactive').count())
+print("Newly Identified Inflow ",len(active_df.loc[(dates['Start Date']<=active_df['Date of Identification']) & (active_df['Date of Identification']<=dates['Reporting Date'])]))
 def housing_lot():
-    housed = filtered_df[filtered_df['Dismissal Reason']=='Housed']
+    housed = exited_df[exited_df['Dismissal Reason']=='Housed']
     lot = [(housed.loc[i,'Program End Date'] - housed.loc[i,'Date of Identification']) for i in housed.index]
     average = 0
     for i in lot:
         average += i.days
     return average/len(lot)
 print("Average Length of Time from ID to Housing Placement ",housing_lot())
+def rtad_counter():
+    rtad = active_df[active_df['Return to Active Date'].isnull()==False]
+    counter = 0
+    for i in rtad.index:
+        if (rtad.loc[i,"Return to Active Date"].year==dates['Reporting Date'].year)& (rtad.loc[i,"Return to Active Date"].month==dates['Reporting Date'].month):
+            counter += 1
+    return counter
+print("Returned to Active ",rtad_counter())
+
+#Step 13, Output
+output = input("Parsing Finished. Output File Name?: ")
+if output=="N":
+    print("No Output")
+else:
+    filtered_df.to_csv(output)
