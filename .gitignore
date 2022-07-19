@@ -2,4 +2,5 @@
 *.csv
 *.xlsx
 *.tfl
+*.png
 __pycache__/

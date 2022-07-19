@@ -32,4 +32,8 @@ dismissal = {"Absent without leave (AWOL)":"Inactive",
 "Transitioned to Outpatient Services - SA":"Housed",
 "Transitioned to Outpatient Services - Mental Health":"Housed",
 "Transitioned to Senior Adult Mental Health":"Housed",
-"Voluntary Departure":"Inactive"}
+"Voluntary Departure":"Inactive",
+"Moved to Arlington Zero Chronic Vet":"No longer meets population criteria",
+"Moved to Arlington Zero Families":"No longer meets population criteria",
+"Moved to Arlington Zero Singles":"No longer meets population criteria",
+"Moved to Arlington Zero TAY":"No longer meets population criteria"}
