@@ -4,4 +4,5 @@
 *.tfl
 *.png
 *.pdf
+*.docx
 __pycache__/
