@@ -5,13 +5,14 @@ import numpy as np
 file = input("File Name?: ")
 df = pd.read_csv(file,parse_dates=['Program Start Date','Program End Date'])
 df = df.rename(columns={"Program Start Date":"Date of Identification",'Case Number':'Client ID','Veteran Status (HUD)':'Veteran Status'})
-df = df.drop('Name',axis=1)
+df = df.drop(['Name','Family Name','Relationship','Gender (HUD)','Race (HUD)','Ethnicity (HUD)'],axis=1)
+# df = df.drop(['Name'],axis=1)
 df = df.drop_duplicates()
 df = df.reset_index()
 df = df.drop(['index'],axis=1)
 
 #Step 2: Adding Household Type Column
-household_type = {"Arlington Zero: Chronic - Veterans Only":"Single Adults",
+household_type = {"Arlington Zero: Chronic or Veterans Only":"Single Adults",
 "Arlington Zero: Single Adults":"Single Adults",
 "Arlington Zero: Families":"Families",
 "Arlington Zero: TAY":"Youth"}
@@ -35,7 +36,7 @@ for i in df.index:
 #Step 4: Adding Chronic Column
 #If client is in Chronic & Vet and 'No' to Veteran Status, then they are chronic
 df['Chronic Status'] = np.nan
-df.loc[(df['Program Name']=="Arlington Zero: Chronic - Veterans Only") & (df['Veteran Status']!="Yes")
+df.loc[(df['Program Name']=="Arlington Zero: Chronic or Veterans Only") & (df['Veteran Status']!="Yes")
 ,"Chronic Status"] = "Yes"
 
 #Step 5, Remap all dismissal reasons
@@ -110,6 +111,8 @@ def rtad_counter():
             counter += 1
     return counter
 print("Returned to Active ",rtad_counter())
+# print("Number of children ",active_df['Relationship'].value_counts()['Child'])
+# print("Number of families ",active_df['Family Name'].where(active_df['Household Type']=='Family').nunique())
 
 #Step 13, Output
 output = input("Parsing Finished. Output File Name?: ")

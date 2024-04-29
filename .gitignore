@@ -6,4 +6,10 @@
 *.pdf
 *.docx
 *.txt
+*.zip
 __pycache__/
+Tableau/
+spreadsheets/
+ZFA/bnl-pipeline/
+ZFA/Samples/
+ZFA/Old Sheets/

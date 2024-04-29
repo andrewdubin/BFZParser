@@ -2,15 +2,16 @@ import pandas as pd
 import numpy as np
 from values import dismissal
 
-#Step 1: Import document, Change Program Start Date to Date of Identification
+#Step 1: Import HMIS document into pandas dataframe, rename columns, drop un-needed ones and duplicates
 file = input("File Name?: ")
 df = pd.read_csv(file,parse_dates=['Program Start Date','Program End Date'])
 df = df.rename(columns={"Program Start Date":"Date of Identification",'Case Number':'Client ID','Veteran Status (HUD)':'Veteran Status',"CH":"Chronic Status"})
-df = df.drop(['Name','Gender (HUD)','Race (HUD)','Ethnicity (HUD)'],axis=1)
+df = df.drop(['Name','Gender (HUD)','Race and Ethnicity (HUD)','DOB'],axis=1)
 df = df.drop_duplicates()
 df = df.reset_index(drop=True)
 
 #Step 2: Adding Household Type Column
+#Maps programs for singles down to Single Adults, programs for families down to Family
 household_type = {"HSC - Shelter":"Single Adults",
 "Residential Program Center (RPC)":"Single Adults",
 "Opportunity Place - Arlington":"Single Adults",
@@ -19,24 +20,27 @@ household_type = {"HSC - Shelter":"Single Adults",
 "Sullivan House":"Family",
 "Family Home":"Family"}
 
-#Need to add in steps to identify youth
 df['Household Type'] = df['Program Name'].map(household_type)
 #Downside to mapping by program names to household types due to contractual oddities (single females may want to be in family shelter)
 
-#Youth steps
-#Change household type filter to head of household filter (youth head of households)
+#TAY steps since we don't have youth specific programs
 for i in df[(df['Age'] >= 18) & (df['Age'] <= 24) & (df['Relationship'] == 'Self/Head of Household')].index:
     df.loc[i,'Household Type'] = 'Youth'
-len(df[df['Household Type'] == 'Youth'])
 
 #Step 3: Adding Client ID Counter and Client ID Household Counter
-#Client ID Counter
+#These aren't picked up by the aggregator, they're used to identify clients with multiple records so we can identify their Return to Active dates later
+#Client ID Counter counts how many times a client appears in the dataset, as it contains 2 years of data so clients can reappear in our system throughout that timeframe.
 df['Client ID Counter'] = df['Client ID'].map(df.groupby('Client ID').agg({'Client ID':'count'})['Client ID'])
-#Client ID Household Counter
+#Client ID Household Counter. Same as Client ID counter but it is also pegged to household type.
+#Example: A client may appear 3 times in the dataset, but they were a youth for two records then aged into a single adult.
+#Client ID Household Counter would be 2 for the youth records, and 1 for the single adult record.
+#This is the counter used for Return to Active calculations
+#Initialize a dictionary with client IDs as keys and a dictionary of household type counts as values.
 counter = {}
 for i in df['Client ID']:
     if i not in counter:
         counter[i] = {"Single Adults":0,"Family":0,"Youth":0}
+#Loop through dictionary
 for j in counter:
     for k in df[df['Client ID']==j]['Household Type']:
         counter[j][k] += 1
@@ -45,33 +49,31 @@ for i in df.index:
     df.loc[i,'Client ID Household Counter'] = counter[df.loc[i,'Client ID']][df.loc[i,'Household Type']]
 df['Client ID Household Counter'] = df['Client ID Household Counter'].apply(int)
 
-#Step 4: Editing Chronic Column
+#Step 4: Remapping Chronic Column values
 df['Chronic Status'] = df['Chronic Status'].map({'CH':"Yes",'Not CH':np.nan})
-df['Chronic Status'].value_counts()
 
-#Step 5, Remap all dismissal reasons
+#Step 5, Remap all dismissal reasons from dismissals dictionary in values.py
 df['Dismissal Reason'] = df['Dismissal Reason'].map(dismissal)
 
-#Step 6, Populate Housing Move-In Date
+#Step 6, Populate Housing Move-In Date. Exit dates of any client record that exited to housing
 df['Housing Move-In Date'] = df["Program End Date"][df["Dismissal Reason"]=="Housed"]
 
-#Step 7, Populate Inactive Date
-#Do we consider those with program end date and null dismissal reasons as inactive?
+#Step 7, Populate Inactive Date. Exit dates of any client record that went inactive.
 df['Inactive Date'] = df['Program End Date'][df["Dismissal Reason"]=="Inactive"]
 
-#Step 8, Calculate 1stDateofID, then calculate Returned to Active Date (Date of Idenfication on second record)
-#Consider revising Return to Active Date formula
+#Step 8, Calculate 1stDateofID, then calculate Returned to Active Date (Date of Idenfication on newest record)
 df['1stDateofID'] = df['Client ID'].map(df.groupby('Client ID').agg({'Date of Identification':'min'})['Date of Identification'])
 df['Return to Active Date'] = np.nan
 df.loc[(df['Client ID Household Counter']>1) & (df['1stDateofID']!=df['Date of Identification'])
 ,"Return to Active Date"] = df['Date of Identification']
 df['Return to Active Date'] = pd.to_datetime(df['Return to Active Date'])
 
-#Step 9, Calculate most recent move-in or inactive dates
+#Step 9, Find most recent move-in or inactive dates per client
 df['Most Recent Move-In Date'] = df['Client ID'].map(df.groupby('Client ID').agg({'Housing Move-In Date':'max'})['Housing Move-In Date'])
 df['Most Recent Inactive Date'] = df['Client ID'].map(df.groupby('Client ID').agg({'Inactive Date':'max'})['Inactive Date'])
 
 #Step 10, Narrow down dataframe down to active clients and newly exited clients for the reporting month
+#Code for inputting dates
 dates = {}
 dates["Reporting Year"] = input("Reporting Year? Enter four digits: ")
 dates["Reporting Month"] = input("Reporting Month? Enter either proper string or number ")
@@ -79,6 +81,7 @@ dates['Start Date'] = pd.to_datetime(dates["Reporting Year"]+dates["Reporting Mo
 dates['Last Day'] = dates['Start Date'].days_in_month
 dates['Reporting Date'] = dates['Start Date'].replace(day=dates['Last Day'])
 
+#Separate dataframe between active clients and exited clients, the recombine.
 active_df = df[(df['Date of Identification']<=dates['Reporting Date']) &
 ((df['Program End Date'].isnull()==True) | (df['Program End Date']<df['Date of Identification']) | (df['Program End Date']>dates['Reporting Date']))]
 exited_df = df[(df['Program End Date']>=dates['Start Date']) & (df['Program End Date']<=dates['Reporting Date'])]
@@ -94,12 +97,13 @@ print("\nHow many clients this month No longer meet population criteria?")
 print("All clients ",exited_df['Dismissal Reason'].where(exited_df['Dismissal Reason']=="No longer meets population criteria").count())
 print("Singles ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Household Type']=='Single Adults')).count())
 print("Veterans ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Veteran Status']=='Yes')).count())
-#print("Chronic ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Chronic Status']=='Yes')).count())
-#print("Chronic Veterans ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Chronic Status']=='Yes')&(exited_df['Veteran Status']=='Yes')).count())
+print("Chronic ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Chronic Status']=='Yes')).count())
+print("Chronic Veterans ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Chronic Status']=='Yes')&(exited_df['Veteran Status']=='Yes')).count())
 print("Youth ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Household Type']=='Youth')).count())
 print("Family ",exited_df['Dismissal Reason'].where((exited_df['Dismissal Reason']=="No longer meets population criteria")&(exited_df['Household Type']=='Family')).count())
 
 #Step 12, Calculate BFZ Reporting Metrics to make sure numbers match
+#This is just for my end as an internal check, not identical to how BFZ aggregator calculates it.
 print("\nBFZ Reporting Metrics")
 print("Actively Homeless ", len(active_df),
 "+",exited_df['Client ID'].where(exited_df['Dismissal Reason']=='No longer meets population criteria').count(),'No longer meet population criteria')
@@ -122,10 +126,7 @@ def rtad_counter():
             counter += 1
     return counter
 print("Returned to Active ",rtad_counter())
-# print("Number of children ",active_df['Relationship'].value_counts()['Child'])
-# print("Number of families ",active_df['Family Name'].where(active_df['Household Type']=='Family').nunique())
 
-#Step 13, Output
 #Step 13, Output
 output = input("Parsing Finished. Output File Name?: ")
 if output=="N":
